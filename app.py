@@ -5,7 +5,7 @@
 # Script Name: streamlit_yfinance01.py
 # Description: YFinance dashboard app for Streamlit
 #
-# Current app version: ver0.1 (Streamlit 0.87)
+# Current app version: ver 0.1 (Streamlit 0.87)
 # @author: 18HIAGC
 # =============================================================================
 
@@ -22,8 +22,7 @@ stock_input1 = 'AAPL'
 stock_input2 = 'NFLX'
 
 ticker_start_date = '2020-01-01'
-ticker_end_date = '2021-7-31'
-
+ticker_end_date = '2021-07-31'
 
 #%% Part 2 : Page Setup (set_page_config), Title and Opening paragraph
 
