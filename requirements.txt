@@ -1,5 +1,5 @@
 altair
-numpy
+datetime
 pandas
+pandas_datareader
 streamlit
-yfinance

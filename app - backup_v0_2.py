@@ -1,24 +1,21 @@
 # -*- coding: utf-8 -*-
 # =============================================================================
 # Created on Thu Jul 15 2021
-# Last Update: 23/11/2021
-# Script Name: streamlit_yfinance_v0_3.py
+# Last Update: 01/11/2021
+# Script Name: streamlit_yfinance_v0_2.py
 # Description: YFinance dashboard app for Streamlit
 #
-# Current app version: ver0.3 (Streamlit 1.00)
+# Current app version: ver0.2 (Streamlit 1.00)
 # @author: 18HIAGC
 #
 # =============================================================================
 
 #%% Part 1.1: Imports
 
+import altair as alt
 from datetime import datetime as dt
 from datetime import timedelta
-from timeit import default_timer
-
-import altair as alt
-from  pandas import concat as pd_concat
-from  pandas import read_csv as pd_read_csv
+from  pandas import read_csv
 import pandas_datareader.data as web
 import streamlit as st
 
@@ -53,10 +50,9 @@ st.set_page_config(
 	page_icon=":dollar:",
 	layout="centered",
 	initial_sidebar_state="expanded",
-    menu_items={'About': "streamlit: yfinance app (ver 0.3) :panda_face: \
+    menu_items={'About': "streamlit yfinance app (ver 0.2) \
                 \n added: live price quotes section \
-                \n added: historical data graph \
-                \n added: chart1 tooltips"
+                \n added: historical data graph "
     }
 )
 
@@ -68,7 +64,6 @@ st.title(':dollar: YFinance Stocks Dashboard :pound:')
 if 'count' not in st.session_state:
     st.session_state['count'] = 0
     st.session_state['last_updated'] = dt.now()
-    st.session_state['elapsed_time'] = 0
 
 
 #%% Part 3 : Functions - Fetch Data / Plot Chart
@@ -77,91 +72,62 @@ def update_counter():
     """ Function to update the sessons state counters
     """
     st.session_state['count'] += 1
-    st.session_state['elapsed_time'] = (dt.now() - st.session_state['last_updated']).total_seconds()
     st.session_state['last_updated'] = dt.now()
-
 
 @st.cache
 def read_historical_csv(nstocks_file):
     """ Functon to read fie for historical nasdaq stock prices and return df
     """
-    nasdaq_df1 = pd_read_csv(FILE_DIR+nstocks_file, parse_dates=['date'])
+    nasdaq_df = read_csv(file_dir+nstocks_file, parse_dates=['date'])
 
-    npivot_df1 = nasdaq_df1.pivot(index='date', columns='symbol', values='price')
-    npivot_df1.reset_index(inplace=True)
+    npivot_df = nasdaq_df.pivot(index='date', columns='symbol', values='price')
+    npivot_df.reset_index(inplace=True)
 
-    return nasdaq_df1, npivot_df1
+    return nasdaq_df, npivot_df
 
-@st.cache
-def fetch_pdr_quote(tickers1, last_update_time1):
+def fetch_pdr_quote(tickers):
     """ Fn to fetch stock summary data for a list of stock codes
         Return: quote dataframe
     """
-    quote_df1 = web.get_quote_yahoo(tickers1)
+    quote_df = web.get_quote_yahoo(tickers)
 
-    return quote_df1
-
+    return quote_df
 
 @st.cache
-def fetch_closing_data(tickers1, yf_closing_file1):
-    """ Fn to fetch pandas_data_reader up-to-date closing prices for listed
-        stock codes and append to existing file data
+def fetch_closing_data(tickers, yf_closing_file):
+    """ Fn to fetch pandas_data_reader up-to-date closing prices for listed stock codes
         Return: ticker closing prices dataframe
     """
-    old_closing_df = pd_read_csv(FILE_DIR+yf_closing_file1, parse_dates=['date'], index_col=0)
-    old_closing_df = old_closing_df.reset_index()
+    fclosing_df1 = web.DataReader(name=tickers, data_source='yahoo',
+                                      start = start_date, end = end_date)
 
-    start_date1 =  old_closing_df['date'].max() + timedelta(days=1)
-    end_date1 = now_date_minus1d
+    fclosing_df = fclosing_df1.loc[:, 'Close'].reset_index()
 
-    if start_date1 < end_date1:
-        new_closing_df = web.DataReader(name=tickers1, data_source='yahoo',
-                                          start = start_date1, end = end_date1) \
-                        .loc[:, 'Close'].reset_index()
+    fclosing_df = fclosing_df.melt(id_vars = ['Date'], value_vars = tickers)
+    fclosing_df.columns = ['date', 'symbol', 'price']
 
-        new_closing_df = new_closing_df.melt(id_vars = ['Date'], value_vars = tickers1)
-        new_closing_df.columns = ['date', 'symbol', 'price']
+    # write closing data to file for later retrieval
+    fclosing_df.to_csv(file_dir+yf_closing_file)
 
-        # join old and new data (axis=0 ~ join on rows)
-        rclosing_df = pd_concat([old_closing_df, new_closing_df], axis=0, ignore_index=True)
-        rclosing_df.sort_values(by=[ 'symbol','date'], inplace=True)
-
-        # write closing data to file for later retrieval
-        rclosing_df.to_csv(FILE_DIR+yf_closing_file1, index=False)
-
-    else:
-        rclosing_df = old_closing_df
-
-    return rclosing_df
-
+    return fclosing_df
 
 @st.cache
-def read_closing_csv(yf_closing_file1):
+def read_closing_csv(yf_closing_file):
     """ Functon to read file for up to date yfinance ticker stock closing prices
         Return: ticker closing prices dataframe
     """
-    rclosing_df = pd_read_csv(FILE_DIR+yf_closing_file1, parse_dates=['date'], index_col=0)
-    rclosing_df = rclosing_df.reset_index()
+    rclosing_df = read_csv(file_dir+yf_closing_file, parse_dates=['date'], index_col=0)
 
     return rclosing_df
 
-
-def display_closing_chart(source, perc_chg1):
+def display_closing_chart(source, perc_chg):
     """ Fn to display closing prices area charts using Altair
     """
     yrange = (source.price.min(), source.price.max())
 
-    if perc_chg1 > 0:   area_color = 'darkGreen'
-    elif perc_chg1 < 0: area_color = 'darkRed'
+    if perc_chg > 0:   area_color = 'darkgreen'
+    elif perc_chg < 0: area_color = 'darkRed'
     else:               area_color = 'yellow'
-
-    hover = alt.selection_single(
-        fields=["date:T"],
-        nearest=True,
-        on="mouseover",
-        empty="none",
-        clear="mouseout"
-    )
 
     chart1 = alt.Chart(source).mark_area(
                 line={'color':area_color},
@@ -181,16 +147,7 @@ def display_closing_chart(source, perc_chg1):
             width=800, height=400
             )
 
-    points = chart1.transform_filter(hover).mark_circle(opacity=1)
-
-    tooltips = alt.Chart(source).mark_rule().encode(
-            x='date:T',
-            opacity=alt.condition(hover, alt.value(0.3), alt.value(0)),
-            tooltip=['date:T', 'price:Q']
-        ).add_selection(hover)
-
-    # (chart1 + points + tooltips).show()
-    st.altair_chart(chart1 + points + tooltips)
+    st.altair_chart(chart1)
 
 
 def display_historical_chart(source):
@@ -215,18 +172,6 @@ def display_historical_chart(source):
         color='symbol:N',
         opacity=alt.condition(selection_legend, alt.value(3), alt.value(0.2)),
         size=alt.value(4)
-    )
-
-    # Draw points on the line, and highlight based on selection
-    points = line.mark_point().encode(
-        opacity=alt.condition(nearest, alt.value(1), alt.value(0))
-    )
-
-    # Draw text labels near the points, and highlight based on selection
-    text = line.mark_text(align='right', dx=-10, dy=-5).encode(
-        text=alt.condition(nearest, 'price:Q', alt.value(''), format='.2f'),
-        opacity=alt.condition(selection_legend, alt.value(1), alt.value(0.5)),
-        size=alt.condition(selection_legend, alt.value(20), alt.value(10))
     )
 
     # Transparent selectors across the chart, tells us x-value of the cursor
@@ -268,7 +213,7 @@ def display_historical_chart(source):
     st.altair_chart(layer)
 
 
-# %% Part 4 : Sidebar (Select Stock Symbol & Display Period)
+#%% Part 4 : Sidebar (Select Stock Symbol & Display Period)
 
 # Sidebar Header
 st.sidebar.header('User Inputs for closing prices')
@@ -282,7 +227,7 @@ with st.sidebar.form(key='sidebar_form'):
 
     period_input = st.select_slider(label='Display period:',
                                    options=['1Y','6M', '3M','1M','1W'],
-                                   value=PERIOD_INPUT_DEFAULT,
+                                   value=period_input_default,
                                    help='Slide options: 1Year, 6Months, 3Months, 1Month, 1Week')
 
     period_map = {'1Y': 365,'6M': 182, '3M':91, '1M': 30,'1W': 7}
@@ -300,45 +245,43 @@ with st.sidebar.form(key='sidebar_form'):
 
 #%% Part 5.1 : Plot 1: Closing Price Plot - Read/Fetch Data
 
-last_update_time = st.session_state['last_updated'].strftime('%Y-%m-%d %H:%M')
-
-quote_fetch_df = fetch_pdr_quote(tickers, last_update_time)
-quote_df = quote_fetch_df.loc[symbol_input, :]
+quote_df = fetch_pdr_quote(tickers)
+quote_df1 = quote_df.loc[symbol_input, :]
 
 
-# %% Part 5.2 : Plot 1: Display Quote live ticker data
+#%% Part 5.2 : Plot 1: Display Quote live ticker data
 
 st.header('**{}** Stock Closing Prices'.
-          format(quote_df['displayName'].upper()) )
+          format(quote_df1['displayName'].upper()) )
 
-st.write('{} [{}]'.format(quote_df['longName'], symbol_input))
-st.write('Current Price : {} {}'.format(quote_df['price'], quote_df['currency']))
+st.write('{} [{}]'.format(quote_df1['longName'], symbol_input))
+st.write('Current Price : {} {}'.format(quote_df1['price'], quote_df1['currency']))
 
-st.write('Mkt State: {}'.format(quote_df['marketState']))
+st.write('Mkt State: {}'.format(quote_df1['marketState']))
 
-if quote_df['marketState'] == 'REGULAR':
-    quote_mkt_time = quote_df['regularMarketTime']
-elif quote_df['marketState'] == 'PREPRE':
-    quote_mkt_time = quote_df['postMarketTime']
-elif quote_df['marketState'] == 'PRE':
-    quote_mkt_time = quote_df['preMarketTime']
-elif  quote_df['marketState'] == 'CLOSED':
-    quote_mkt_time = quote_df['postMarketTime']
+if quote_df1['marketState'] == 'REGULAR':
+    quote_mkt_time = quote_df1['regularMarketTime']
+elif quote_df1['marketState'] == 'PREPRE':
+    quote_mkt_time = quote_df1['preMarketTime']
+elif quote_df1['marketState'] == 'PRE':
+    quote_mkt_time = quote_df1['preMarketTime']
+elif  quote_df1['marketState'] == 'CLOSED':
+    quote_mkt_time = quote_df1['postMarketTime']
 else:
     quote_mkt_time = dt.now()
 
 mkt_time = (dt.fromtimestamp(quote_mkt_time)).strftime('%Y-%m-%d %H:%M')
 st.write('Last Update:  {}'.format(mkt_time))
 
-
-t1 = default_timer()
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 # Fetch data from yfinance feed (no caching) on session start
 if st.session_state['count'] < 2:
-    closing_df = fetch_closing_data(tickers, YF_CLOSING_FILE)
+    closing_df = fetch_closing_data(tickers, yf_closing_file)
 else:
-    # Fetch data from yf_closing file on subsequent updates
-    closing_df = read_closing_csv(YF_CLOSING_FILE)
+    closing_df = read_closing_csv(yf_closing_file)
+
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 symbol_filter = closing_df['symbol'] == symbol_input
 period_filter = (closing_df['date'] >= now_date_minusT1) & \
@@ -346,38 +289,31 @@ period_filter = (closing_df['date'] >= now_date_minusT1) & \
 
 filtered_df = closing_df[symbol_filter & period_filter]
 filtered_df = filtered_df.sort_values(by=['date'], ascending=False)
-
 filtered_df.reset_index(drop=True, inplace=True)
 
 
-# %% Part 5.3 : Plot 1: Display Headers Closing Price Plot and DF
+#%% Part 5.3 : Plot 1: Display Headers Closing Price Plot and DF
+
+price_s = filtered_df.price
+p0 = price_s.iloc[0]
+p1 = price_s.iloc[-1]
+perc_chg = (p0-p1)/p1*100
+nowT0_formatted = now_date_minusT0.strftime('%Y-%m-%d')
+st.write('perc. change since {}: {:+.2f}%'.format(nowT0_formatted, perc_chg))
+
+# Display Atair line-chart
+display_closing_chart(filtered_df, perc_chg)
+
+# Display raw data as a table
+st.write(filtered_df.style.format(precision=2,
+                                      formatter={'date': '{:%Y-%m-%d}'}))
 
 
-# if headers data is not blank continue, else display error message
-if len(filtered_df) > 0 :
-
-    p0 = filtered_df.iat[-1, 2]
-    p1 = filtered_df.iat[0, 2]
-    perc_chg = ((p1/p0)-1)*100
-
-    nowT0_formatted = now_date_minusT0.strftime('%Y-%m-%d')
-    st.write('perc. change since {}: {:+.2f}%'.format(nowT0_formatted, perc_chg))
-
-    # Display Atair line-chart
-    display_closing_chart(filtered_df, perc_chg)
-
-    # Display raw data as a table
-    st.write(filtered_df.style.format(precision=2,
-                                          formatter={'date': '{:%Y-%m-%d}'}))
-else:
-    st.subheader('No data available')
-
-
-# %% Part 6 : Display Plot 2,: Historical Price Plot
+#%% Part 6 : Display Plot 2,: Histrical Price Plot
 
 st.header('Historical NASDAQ Prices')
 
-nasdaq_df, npivot_df = read_historical_csv(NSTOCKS_FILE)
+nasdaq_df, npivot_df = read_historical_csv(nstocks_file)
 
 # Display Atair historical line-chart
 display_historical_chart(nasdaq_df)
