@@ -1,35 +1,30 @@
 # -*- coding: utf-8 -*-
 # =============================================================================
 # Created on Thu Jul 15 2021
-# Last Update: 23/12/2021
-# Script Name: streamlit_yfinance_v0_4.py
+# Last Update: 23/11/2021
+# Script Name: streamlit_yfinance_v0_3.py
 # Description: YFinance dashboard app for Streamlit
 #
-# Previously deployed app version: ver0.3 (Streamlit 1.00) - 23/11/2021
-# Current app version: ver0.4 (Streamlit 1.3.0)
+# Current app version: ver0.3 (Streamlit 1.00)
 # @author: 18HIAGC
+#
 # =============================================================================
 
 #%% Part 1.1: Imports
 
 from datetime import datetime as dt
 from datetime import timedelta
+from timeit import default_timer
 
 import altair as alt
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials as sac
-import pandas as pd
+from  pandas import concat as pd_concat
+from  pandas import read_csv as pd_read_csv
 import pandas_datareader.data as web
 import streamlit as st
 
 FILE_DIR = './data/' # base folder is the current directory
-
-NSTOCKS_FILE = 'nasdaq_stocks_2010-22.csv'
-NSTOCKS_PATH = FILE_DIR + NSTOCKS_FILE
-
-cred_dict = st.secrets.gcp_service_account.credentials_dict
-gsheet_name = st.secrets.gsheet_name
-WSHEET_NUM = 0
+NSTOCKS_FILE = 'nasdaq_stocks_2010-21.csv'
+YF_CLOSING_FILE = 'yf_closing_2021.csv'
 
 
 #%% Part 1.1: Ticker codes and date setup
@@ -58,9 +53,10 @@ st.set_page_config(
 	page_icon=":dollar:",
 	layout="centered",
 	initial_sidebar_state="expanded",
-    menu_items={'About': "streamlit: yfinance app (ver 0.4 - 2021-12-22) :panda_face: \
-                \n Updated: data file formats \
-                \n Added: GSheets integration"
+    menu_items={'About': "streamlit: yfinance app (ver 0.3) :panda_face: \
+                \n added: live price quotes section \
+                \n added: historical data graph \
+                \n added: chart1 tooltips"
     }
 )
 
@@ -82,23 +78,22 @@ def update_counter():
     """
     st.session_state['count'] += 1
     st.session_state['elapsed_time'] = (dt.now() - st.session_state['last_updated']).total_seconds()
-
     st.session_state['last_updated'] = dt.now()
 
 
 @st.cache
-def read_historical_csv(nstocks_path1, tickers1):
+def read_historical_csv(nstocks_file):
     """ Functon to read fie for historical nasdaq stock prices and return df
     """
-    npivot_df1 = pd.read_csv(nstocks_path1, parse_dates=['date'])
-    nasdaq_df1 = npivot_df1.melt(id_vars = ['date'], value_vars = tickers1)
-    nasdaq_df1.columns = ['date', 'symbol', 'price']
+    nasdaq_df1 = pd_read_csv(FILE_DIR+nstocks_file, parse_dates=['date'])
+
+    npivot_df1 = nasdaq_df1.pivot(index='date', columns='symbol', values='price')
+    npivot_df1.reset_index(inplace=True)
 
     return nasdaq_df1, npivot_df1
 
-
 @st.cache
-def fetch_pdr_quote(tickers1):
+def fetch_pdr_quote(tickers1, last_update_time1):
     """ Fn to fetch stock summary data for a list of stock codes
         Return: quote dataframe
     """
@@ -106,74 +101,47 @@ def fetch_pdr_quote(tickers1):
 
     return quote_df1
 
-def gsheet2df(cred_dict1, gsheet_name1, wsheet_num1):
-    """ Function to fetch a google sheet and convert it into a df """
-    scope = ['https://spreadsheets.google.com/feeds',
-             'https://www.googleapis.com/auth/drive']
 
-    credentials = sac.from_json_keyfile_dict(cred_dict1, scope)
-    client = gspread.authorize(credentials)
-
-    gsheet1 = client.open(gsheet_name1)
-    worksheet = gsheet1.get_worksheet(wsheet_num1).get_all_records()
-
-    df1 = pd.DataFrame(worksheet)
-    df1['Date'] = pd.to_datetime(df1['Date'])
-    df1.set_index('Date', drop=True, inplace=True)
-
-    return df1
-
-
-def gsheet_append(cred_dict1, gsheet_name1, wsheet_num1, new_df1):
-    """ Function to append rows to a gsheets file """
-    scope = ['https://spreadsheets.google.com/feeds',
-         'https://www.googleapis.com/auth/drive']
-
-    credentials = sac.from_json_keyfile_dict(cred_dict1, scope)
-    client = gspread.authorize(credentials)
-
-    gsheet1 = client.open(gsheet_name1)
-    worksheet1 = gsheet1.get_worksheet(wsheet_num1)
-
-    new_df1.index = new_df1.index.astype(str)
-    add1_list = new_df1.reset_index().values.tolist()
-    worksheet1.append_rows(add1_list)
-
-    return None
-
-
-# @st.cache
-def fetch_closing_data(tickers1, cred_dict1, gsheet_name1, wsheet_num1):
+@st.cache
+def fetch_closing_data(tickers1, yf_closing_file1):
     """ Fn to fetch pandas_data_reader up-to-date closing prices for listed
-        stock codes and append to existing gsheets file data
+        stock codes and append to existing file data
         Return: ticker closing prices dataframe
     """
-    old_closing_df = gsheet2df(cred_dict1, gsheet_name1, wsheet_num1)
+    old_closing_df = pd_read_csv(FILE_DIR+yf_closing_file1, parse_dates=['date'], index_col=0)
+    old_closing_df = old_closing_df.reset_index()
 
-    if len(old_closing_df) > 0:
-        start_date1 = old_closing_df.index.max() + timedelta(days=1)
-    else:
-        start_date1 = now_date_minus1Y
-
+    start_date1 =  old_closing_df['date'].max() + timedelta(days=1)
     end_date1 = now_date_minus1d
 
     if start_date1 < end_date1:
         new_closing_df = web.DataReader(name=tickers1, data_source='yahoo',
-                                        start=start_date1, end=end_date1) \
-                        .loc[:, 'Close']
+                                          start = start_date1, end = end_date1) \
+                        .loc[:, 'Close'].reset_index()
 
-        new_closing_df = new_closing_df.drop_duplicates()
-        new_closing_df = new_closing_df.round(decimals = 2)
+        new_closing_df = new_closing_df.melt(id_vars = ['Date'], value_vars = tickers1)
+        new_closing_df.columns = ['date', 'symbol', 'price']
 
-        gsheet_append(cred_dict1, gsheet_name1, wsheet_num1, new_closing_df)
+        # join old and new data (axis=0 ~ join on rows)
+        rclosing_df = pd_concat([old_closing_df, new_closing_df], axis=0, ignore_index=True)
+        rclosing_df.sort_values(by=[ 'symbol','date'], inplace=True)
 
-        # join old and new data (axis=0 i.e. join on rows)
-        rclosing_df = pd.concat([old_closing_df, new_closing_df], axis=0)
+        # write closing data to file for later retrieval
+        rclosing_df.to_csv(FILE_DIR+yf_closing_file1, index=False)
 
     else:
         rclosing_df = old_closing_df
 
-    rclosing_df.index = pd.to_datetime(rclosing_df.index)
+    return rclosing_df
+
+
+@st.cache
+def read_closing_csv(yf_closing_file1):
+    """ Functon to read file for up to date yfinance ticker stock closing prices
+        Return: ticker closing prices dataframe
+    """
+    rclosing_df = pd_read_csv(FILE_DIR+yf_closing_file1, parse_dates=['date'], index_col=0)
+    rclosing_df = rclosing_df.reset_index()
 
     return rclosing_df
 
@@ -213,21 +181,23 @@ def display_closing_chart(source, perc_chg1):
             width=800, height=400
             )
 
+    points = chart1.transform_filter(hover).mark_circle(opacity=1)
+
     tooltips = alt.Chart(source).mark_rule().encode(
             x='date:T',
-            opacity=alt.condition(hover, alt.value(0.9), alt.value(0)),
+            opacity=alt.condition(hover, alt.value(0.3), alt.value(0)),
             tooltip=['date:T', 'price:Q']
         ).add_selection(hover)
 
-    points = chart1.transform_filter(hover).mark_point(color='red')
-
-    st.altair_chart(chart1 + tooltips + points)
+    # (chart1 + points + tooltips).show()
+    st.altair_chart(chart1 + points + tooltips)
 
 
 def display_historical_chart(source):
     """ Fn to display multiple line charts on a singe axis using Altair
         Input: nasdaq_df from fn: read_historical_csv
     """
+
     # Create a selection that chooses the nearest point & selects based on x-value
     nearest = alt.selection(type='single', nearest=True, on='mouseover',
                             fields=['date'], empty='none')
@@ -328,13 +298,11 @@ with st.sidebar.form(key='sidebar_form'):
                                           help='Click to Submit selections')
 
 
-# %% Part 5.1 : Plot 1: Closing Price Plot - Read/Fetch Data
+#%% Part 5.1 : Plot 1: Closing Price Plot - Read/Fetch Data
 
-# fetch last update time session state variable to feed to fetch_pdr_quote()
-# the time variable indicates a change to time and necessity for fn rerun
 last_update_time = st.session_state['last_updated'].strftime('%Y-%m-%d %H:%M')
 
-quote_fetch_df = fetch_pdr_quote(tickers)
+quote_fetch_df = fetch_pdr_quote(tickers, last_update_time)
 quote_df = quote_fetch_df.loc[symbol_input, :]
 
 
@@ -363,40 +331,44 @@ mkt_time = (dt.fromtimestamp(quote_mkt_time)).strftime('%Y-%m-%d %H:%M')
 st.write('Last Update:  {}'.format(mkt_time))
 
 
+t1 = default_timer()
+
+# Fetch data from yfinance feed (no caching) on session start
+if st.session_state['count'] < 2:
+    closing_df = fetch_closing_data(tickers, YF_CLOSING_FILE)
+else:
+    # Fetch data from yf_closing file on subsequent updates
+    closing_df = read_closing_csv(YF_CLOSING_FILE)
+
+symbol_filter = closing_df['symbol'] == symbol_input
+period_filter = (closing_df['date'] >= now_date_minusT1) & \
+                    (closing_df['date'] < now_date)
+
+filtered_df = closing_df[symbol_filter & period_filter]
+filtered_df = filtered_df.sort_values(by=['date'], ascending=False)
+
+filtered_df.reset_index(drop=True, inplace=True)
+
+
 # %% Part 5.3 : Plot 1: Display Headers Closing Price Plot and DF
 
-# Fetch data from yfinance feed / gsheets data file
-if st.session_state['count'] < 2:
-    closing_df = fetch_closing_data(tickers, cred_dict, gsheet_name, WSHEET_NUM)
-else:
-    closing_df = gsheet2df(cred_dict, gsheet_name, WSHEET_NUM)
-
-# Filter closing_df data by sidebar selections
-period_filter = (closing_df.index >= now_date_minusT1) & \
-                    (closing_df.index < now_date)
-
-filtered_df = closing_df[[symbol_input]][period_filter]
-filtered_df = filtered_df.reset_index()
-filtered_df.columns = ['date', 'price']
-filtered_df = filtered_df.sort_index(ascending=False)
-
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 # if headers data is not blank continue, else display error message
 if len(filtered_df) > 0 :
 
-    p0 = filtered_df.iat[-1, 1]
-    p1 = filtered_df.iat[0, 1]
-    period_perc_chg = (100*(p1 - p0)) / p0
+    p0 = filtered_df.iat[-1, 2]
+    p1 = filtered_df.iat[0, 2]
+    perc_chg = ((p1/p0)-1)*100
 
     nowT0_formatted = now_date_minusT0.strftime('%Y-%m-%d')
-    st.write('perc. change since {}: {:+.2f}%'.format(nowT0_formatted, period_perc_chg))
+    st.write('perc. change since {}: {:+.2f}%'.format(nowT0_formatted, perc_chg))
 
     # Display Atair line-chart
-    display_closing_chart(filtered_df, period_perc_chg)
+    display_closing_chart(filtered_df, perc_chg)
 
     # Display raw data as a table
-    st.write(filtered_df.style.format(precision=2,formatter={'date': '{:%Y-%m-%d}'}))
+    st.write(filtered_df.style.format(precision=2,
+                                          formatter={'date': '{:%Y-%m-%d}'}))
 else:
     st.subheader('No data available')
 
@@ -405,7 +377,7 @@ else:
 
 st.header('Historical NASDAQ Prices')
 
-nasdaq_df, npivot_df = read_historical_csv(NSTOCKS_PATH, tickers)
+nasdaq_df, npivot_df = read_historical_csv(NSTOCKS_FILE)
 
 # Display Atair historical line-chart
 display_historical_chart(nasdaq_df)
