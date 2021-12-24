@@ -85,7 +85,7 @@ def update_counter():
     st.session_state['last_updated'] = dt.now()
 
 
-@st.cache
+# @st.cache
 def cred_dict_constructor():
     """ Function to construct the cred_dict (credentials dictionary)
     """
