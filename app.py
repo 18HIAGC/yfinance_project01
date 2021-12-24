@@ -18,7 +18,6 @@ from datetime import timedelta
 import altair as alt
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials as sac
-from google.oauth2 import service_account
 import pandas as pd
 import pandas_datareader.data as web
 import streamlit as st
@@ -58,7 +57,7 @@ st.set_page_config(
 	page_icon=":dollar:",
 	layout="centered",
 	initial_sidebar_state="expanded",
-    menu_items={'About': "streamlit: yfinance app (ver 0.4 - 2021-12-22) :panda_face: \
+    menu_items={'About': "streamlit: yfinance app (ver 0.4.3 - 2021-12-24) :panda_face: \
                 \n Updated: data file formats \
                 \n Added: GSheets integration"
     }
