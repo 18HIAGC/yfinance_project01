@@ -85,21 +85,21 @@ def update_counter():
     st.session_state['last_updated'] = dt.now()
 
 
-@st.cache
+# @st.cache
 def cred_dict_constructor():
     """ Function to construct the cred_dict (credentials dictionary)
     """
     cred_dict1 = dict(
-        type = st.secrets["gcp_service_account"]["type"],
-        project_id = st.secrets["gcp_service_account"]["project_id"],
-        private_key_id = st.secrets["gcp_service_account"]["private_key_id"],
-        private_key = st.secrets["gcp_service_account"]["private_key"],
-        client_email = st.secrets["gcp_service_account"]["client_email"],
-        client_id = st.secrets["gcp_service_account"]["client_id"],
-        auth_uri = st.secrets["gcp_service_account"]["auth_uri"],
-        token_uri = st.secrets["gcp_service_account"]["token_uri"],
-        auth_provider_x509_cert_url = st.secrets["gcp_service_account"]["auth_provider_x509_cert_url"],
-        client_x509_cert_url = st.secrets["gcp_service_account"]["client_x509_cert_url"]
+        type = st.secrets['gcp_service_account']['type'],
+        project_id = st.secrets['gcp_service_account']['project_id'],
+        private_key_id = st.secrets['gcp_service_account']['private_key_id'],
+        private_key = st.secrets['gcp_service_account']['private_key'],
+        client_email = st.secrets['gcp_service_account']['client_email'],
+        client_id = st.secrets['gcp_service_account']['client_id'],
+        auth_uri = st.secrets['gcp_service_account']['auth_uri'],
+        token_uri = st.secrets['gcp_service_account']['token_uri'],
+        auth_provider_x509_cert_url = st.secrets['gcp_service_account']['auth_provider_x509_cert_url'],
+        client_x509_cert_url = st.secrets['gcp_service_account']['client_x509_cert_url']
         )
 
     return cred_dict1
