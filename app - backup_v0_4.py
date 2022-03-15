@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 # =============================================================================
-# Created on Thu 2021-07-15
-# Last Update: 2022-03-15
-# Script Name: streamlit_yfinance_v0_5.py
+# Created on Thu Jul 15 2021
+# Last Update: 23/12/2021
+# Script Name: streamlit_yfinance_v0_4.py
 # Description: YFinance dashboard app for Streamlit
 #
-# Previously deployed app version: ver0.4 (Streamlit 1.30) - 2021-12-24
-# Current version: ver0.5 (Streamlit 1.7.0)
+# Previously deployed app version: ver0.3 (Streamlit 1.00) - 23/11/2021
+# Current app version: ver0.4 (Streamlit 1.3.0)
 # @author: 18HIAGC
 # =============================================================================
 
@@ -21,8 +21,6 @@ from oauth2client.service_account import ServiceAccountCredentials as sac
 import pandas as pd
 import pandas_datareader.data as web
 import streamlit as st
-import yfinance as yf
-
 
 FILE_DIR = './data/' # base folder is the current directory
 
@@ -35,16 +33,16 @@ WSHEET_NUM = 0
 
 #%% Part 1.1: Ticker codes and date setup
 
-TICKERS = ['AAPL', 'AMZN', 'GOOG', 'MSFT', 'NFLX', 'TSLA']
-symbol_input_default = TICKERS.index('AAPL')
+tickers = ['AAPL', 'AMZN', 'GOOG', 'MSFT', 'NFLX', 'TSLA']
+symbol_input_default = tickers.index('AAPL')
 PERIOD_INPUT_DEFAULT = '3M'
 
 now_time = dt.now().strftime('%Y-%m-%d %H:%M')
 
 now_date = dt.now().strftime('%Y-%m-%d')
-now_date_minus3M = (dt.now().date() - timedelta(days=1)) - timedelta(weeks=13)
-now_date_minus1Y = (dt.now().date() - timedelta(days=1)) - timedelta(weeks=52)
-now_date_minus1d = (dt.now().date() - timedelta(days=1))
+now_date_minus3M = (dt.now() - timedelta(days=1)) - timedelta(weeks=13)
+now_date_minus1Y = (dt.now() - timedelta(days=1)) - timedelta(weeks=52)
+now_date_minus1d = (dt.now() - timedelta(days=1))
 
 # Ticker data start and end
 start_date = now_date_minus1Y
@@ -59,7 +57,7 @@ st.set_page_config(
 	page_icon=":dollar:",
 	layout="centered",
 	initial_sidebar_state="expanded",
-    menu_items={'About': "streamlit: yfinance app (ver 0.5 - 2022-03-15) :panda_face: \
+    menu_items={'About': "streamlit: yfinance app (ver 0.4.3 - 2021-12-24) :panda_face: \
                 \n Updated: data file formats \
                 \n Added: GSheets integration"
     }
@@ -109,14 +107,14 @@ def cred_dict_constructor():
 
 @st.cache
 def read_historical_csv(nstocks_path1, tickers1):
-    """ Functon to read locallly stored csv file for historical nasdaq stock
-        prices and return df
+    """ Functon to read fie for historical nasdaq stock prices and return df
     """
     npivot_df1 = pd.read_csv(nstocks_path1, parse_dates=['date'])
     nasdaq_df1 = npivot_df1.melt(id_vars = ['date'], value_vars = tickers1)
     nasdaq_df1.columns = ['date', 'symbol', 'price']
 
     return nasdaq_df1, npivot_df1
+
 
 @st.cache
 def fetch_pdr_quote(tickers1):
@@ -163,31 +161,6 @@ def gsheet_append(cred_dict1, gsheet_name1, wsheet_num1, new_df1):
     return None
 
 
-@st.cache
-def new_closing_feed(start_date, end_date, tickers):
-    """ Function to fetch closing price data frm the YFinance feed
-        Return: pivot_closing_df (df)
-    """
-    start_date_p1 = (start_date + timedelta(days=1))
-    end_date_p1 = (end_date + timedelta(days=1))
-    closing_df = pd.DataFrame(data=[], columns=['Close', 'symbol'])
-
-    for symbol in tickers:
-        ticker = yf.Ticker(symbol)
-
-        hist = ticker.history(start=start_date_p1, end=end_date_p1, rounding=True) \
-                    ['Close'].to_frame()
-        hist['symbol'] = symbol
-
-        closing_df = pd.concat([closing_df, hist], axis=0)
-
-    closing_df.reset_index(drop=False, inplace=True)
-    pivot_closing_df = closing_df.pivot(index='index', columns='symbol',
-                                        values='Close')
-
-    return pivot_closing_df
-
-
 # @st.cache
 def fetch_closing_data(tickers1, cred_dict1, gsheet_name1, wsheet_num1):
     """ Fn to fetch pandas_data_reader up-to-date closing prices for listed
@@ -197,16 +170,19 @@ def fetch_closing_data(tickers1, cred_dict1, gsheet_name1, wsheet_num1):
     old_closing_df = gsheet2df(cred_dict1, gsheet_name1, wsheet_num1)
 
     if len(old_closing_df) > 0:
-        start_date1 = (old_closing_df.index.max().date() + timedelta(days=1))
+        start_date1 = old_closing_df.index.max() + timedelta(days=1)
     else:
         start_date1 = now_date_minus1Y
 
     end_date1 = now_date_minus1d
 
     if start_date1 < end_date1:
-        new_closing_df = new_closing_feed(start_date1, end_date1, TICKERS)
+        new_closing_df = web.DataReader(name=tickers1, data_source='yahoo',
+                                        start=start_date1, end=end_date1) \
+                        .loc[:, 'Close']
 
-        new_closing_df = new_closing_df.drop_duplicates().round(decimals = 2)
+        new_closing_df = new_closing_df.drop_duplicates()
+        new_closing_df = new_closing_df.round(decimals = 2)
 
         gsheet_append(cred_dict1, gsheet_name1, wsheet_num1, new_closing_df)
 
@@ -349,7 +325,7 @@ st.sidebar.header('User Inputs for closing prices')
 with st.sidebar.form(key='sidebar_form'):
     st.subheader(':star: Make selection & click Submit')
 
-    symbol_input = st.radio(label='Stock Symbol:', options=TICKERS,
+    symbol_input = st.radio(label='Stock Symbol:', options=tickers,
                             index=symbol_input_default,
                             help='Choose one of the stock symbols to display')
 
@@ -377,7 +353,7 @@ with st.sidebar.form(key='sidebar_form'):
 # the time variable indicates a change to time and necessity for fn rerun
 last_update_time = st.session_state['last_updated'].strftime('%Y-%m-%d %H:%M')
 
-quote_fetch_df = fetch_pdr_quote(TICKERS)
+quote_fetch_df = fetch_pdr_quote(tickers)
 quote_df = quote_fetch_df.loc[symbol_input, :]
 
 
@@ -413,7 +389,7 @@ cred_dict = cred_dict_constructor()
 
 # Fetch data from yfinance feed / gsheets data file
 if st.session_state['count'] < 2:
-    closing_df = fetch_closing_data(TICKERS, cred_dict, gsheet_name, WSHEET_NUM)
+    closing_df = fetch_closing_data(tickers, cred_dict, gsheet_name, WSHEET_NUM)
 else:
     closing_df = gsheet2df(cred_dict, gsheet_name, WSHEET_NUM)
 
@@ -451,11 +427,11 @@ else:
 
 st.header('Historical NASDAQ Prices')
 
-nasdaq_df, npivot_df = read_historical_csv(NSTOCKS_PATH, TICKERS)
+nasdaq_df, npivot_df = read_historical_csv(NSTOCKS_PATH, tickers)
 
-# Display Atair historical line-chart (using long format nasdaq data)
+# Display Atair historical line-chart
 display_historical_chart(nasdaq_df)
 
-# Display raw data as a table (using short format / pivoted nasdaq data)
+# Display raw data as a table
 st.dataframe(npivot_df.style.format(precision=2,
                 formatter={'date': '{:%Y-%m-%d}'}, na_rep='-' ))
