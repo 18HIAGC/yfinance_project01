@@ -5,3 +5,4 @@ oauth2client
 pandas
 pandas_datareader
 streamlit
+yfinance
