@@ -86,8 +86,6 @@ def update_counter():
 
     st.session_state['last_updated'] = dt.now()
 
-
-
 @st.cache
 def read_historical_csv(nstocks_path1, tickers1):
     """ Functon to read locallly stored csv file for historical nasdaq stock
