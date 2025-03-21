@@ -1,8 +1,5 @@
 altair
 datetime
-gspread
-oauth2client
-pandas
-pandas_datareader
 streamlit
+streamlit_gsheets
 yfinance
