@@ -1,5 +1,5 @@
 altair
 datetime
 streamlit
-streamlit_gsheets
+st-gsheets-connection
 yfinance
