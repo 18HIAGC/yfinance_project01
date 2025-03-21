@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # =============================================================================
 # Created on Thu 2021-07-15
-# Last Update: 2025-03-19
+# Last Update: 2025-03-21
 # Script Name: streamlit_yfinance_v0_6.py
 # Description: YFinance dashboard app for Streamlit
 #
@@ -23,6 +23,7 @@ import yfinance as yf
 
 #%% Part 1.2: Parameters & Additional Setup
 
+SPREADSHEET_NAME_YF_NASDAQ = 'yf_daily_closing'
 WORKSHEET_NAME_YF_NASDAQ = 'nasdaq_monthly'
 
 TICKERS = ['AAPL', 'AMZN', 'GOOG', 'MSFT', 'NFLX', 'TSLA']
@@ -99,10 +100,11 @@ def update_counter():
 
 
 @st.cache_data
-def gsheet2df(wsheet_name):
+def gsheet2df(spreadsheet_name, wsheet_name):
     """ Function to fetch a google sheet and convert it into a df """
     # read from private google sheets worksheet
-    df1 = conn_yf.read(worksheet=wsheet_name)
+    df1 = conn_yf.read(spreadsheet=spreadsheet_name,
+                       worksheet=wsheet_name)
     # df1.set_index('Date', drop=True, inplace=True)
 
     return df1
@@ -286,8 +288,6 @@ with st.sidebar.form(key='sidebar_form'):
                                           help='Click to Submit selections')
 
 
-
-
 # %% Part 5 : Display Headers & Closing Price Plot (PLot 1) and DF
 
 # Fetch data from yfinance feed / gsheets data file
@@ -336,7 +336,7 @@ else:
 st.header('Historical NASDAQ Prices')
 
 # nasdaq_df, npivot_df = read_historical_csv(NSTOCKS_PATH, TICKERS)
-nasdaq_df = gsheet2df(WORKSHEET_NAME_YF_NASDAQ)
+nasdaq_df = gsheet2df(SPREADSHEET_NAME_YF_NASDAQ, WORKSHEET_NAME_YF_NASDAQ)
 
 # melt df i.e. unpivot data
 df_melt = nasdaq_df.melt(id_vars=['Date'])
