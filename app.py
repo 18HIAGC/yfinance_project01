@@ -6,10 +6,9 @@
 # Description: YFinance dashboard app for Streamlit
 #
 # Previously deployed app version: ver0.5 (Streamlit 1.30) - 2023-03-15
-# Current version: ver0.6 (Streamlit 1.43.2)
+# Current version: ver0.6.2 (Streamlit 1.43.2)
 # @author: 18HIAGC
 # =============================================================================
-
 
 #%% Part 1.1: Imports
 
@@ -23,8 +22,9 @@ import yfinance as yf
 
 #%% Part 1.2: Parameters & Additional Setup
 
-SPREADSHEET_NAME_YF_NASDAQ = 'yf_daily_closing'
 WORKSHEET_NAME_YF_NASDAQ = 'nasdaq_monthly'
+# spreadsheet_url = "https://docs.google.com/spreadsheets/d/1dadZnxuTeE01InzSMwG1AmVM4Z7Le73nJy9OGeWUZX0/"
+spreadsheet_url = st.secrets.connections.gsheets_yfinance.spreadsheet
 
 TICKERS = ['AAPL', 'AMZN', 'GOOG', 'MSFT', 'NFLX', 'TSLA']
 SYMBOL_INPUT_DEFAULT = 0
@@ -336,7 +336,7 @@ else:
 st.header('Historical NASDAQ Prices')
 
 # nasdaq_df, npivot_df = read_historical_csv(NSTOCKS_PATH, TICKERS)
-nasdaq_df = gsheet2df(SPREADSHEET_NAME_YF_NASDAQ, WORKSHEET_NAME_YF_NASDAQ)
+nasdaq_df = gsheet2df(spreadsheet_url, WORKSHEET_NAME_YF_NASDAQ)
 
 # melt df i.e. unpivot data
 df_melt = nasdaq_df.melt(id_vars=['Date'])
